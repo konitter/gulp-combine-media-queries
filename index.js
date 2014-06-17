@@ -331,13 +331,13 @@ module.exports = function(options) {
         base: file.base,
         path: extFilename,
         contents: new Buffer(strMediaStyles)
-      });
+      });     
       log(gutil.colors.cyan('File ' + extFilename + ' created.'));
     }
+    this.push(file);
     if (options.use_external) {
       this.push(f);
     }
-    this.push(file);
 
     cb();
   }
