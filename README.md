@@ -35,6 +35,12 @@ Type: `boolean` Default: `false`
 
 Log processed media queries.
 
+### use_external
+
+Type: `boolean` Default: `false`
+
+Writes media queries into external file, named as [src].responsive.css
+
 ## License
 
 (MIT License)
