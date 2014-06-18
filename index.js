@@ -14,7 +14,7 @@ module.exports = function(options) {
   var options = defaults(options || {}, {
     log: false,
     ext: false,
-    use_external: true
+    use_external: false
   });
 
   // Log info only when 'options.log' is set to true
