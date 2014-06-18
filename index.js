@@ -327,7 +327,7 @@ module.exports = function(options) {
     log(gutil.colors.cyan('File ' + filename + ' created.'));
 
     if (options.use_external && processedCSS.media.length !== 0) {
-      var f = gutil.File({
+      var f = new gutil.File({
         base: file.base,
         path: extFilename,
         contents: new Buffer(strMediaStyles)
