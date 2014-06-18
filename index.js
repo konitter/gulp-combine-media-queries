@@ -326,7 +326,7 @@ module.exports = function(options) {
     file.contents = new Buffer(strStyles);
     log(gutil.colors.cyan('File ' + filename + ' created.'));
 
-    if (options.use_external) {
+    if (options.use_external && processedCSS.media.length !== 0) {
       var f = gutil.File({
         base: file.base,
         path: extFilename,
@@ -335,7 +335,7 @@ module.exports = function(options) {
       log(gutil.colors.cyan('File ' + extFilename + ' created.'));
     }
     this.push(file);
-    if (options.use_external) {
+    if (options.use_external && processedCSS.media.length !== 0) {
       this.push(f);
     }
 
