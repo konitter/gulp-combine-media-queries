@@ -1,42 +1,43 @@
-var gutil       = require('gulp-util');
+var gutil = require('gulp-util');
 var PluginError = gutil.PluginError;
-var through     = require('through2');
-var defaults    = require('lodash.defaults');
-var parseCss    = require('css-parse');
-var path        = require('path');
+var through = require('through2');
+var defaults = require('lodash.defaults');
+var parseCss = require('css-parse');
+var path = require('path');
 
 var PLUGIN_NAME = 'gulp-combine-media-queries';
 
-module.exports = function (options) {
+module.exports = function(options) {
   'use strict';
 
   // Default options
   var options = defaults(options || {}, {
     log: false,
-    ext: false
+    ext: false,
+    use_external: false
   });
 
   // Log info only when 'options.log' is set to true
-  var log = function (message) {
+  var log = function(message) {
     if (options.log) {
       gutil.log(message);
     }
   };
 
   // Process comments
-  var processComment = function (comment) {
+  var processComment = function(comment) {
     var strCss = '/*' + comment.comment + '*/';
     return strCss;
   };
 
   // Process declaration
-  var processDeclaration = function (declaration) {
+  var processDeclaration = function(declaration) {
     var strCss = declaration.property + ': ' + declaration.value + ';';
     return strCss;
   };
 
   // Check declarations type
-  var commentOrDeclaration = function (declarations) {
+  var commentOrDeclaration = function(declarations) {
     var strCss = '';
     if (declarations.type === 'declaration') {
       strCss += '\n\t' + processDeclaration(declarations);
@@ -47,10 +48,10 @@ module.exports = function (options) {
   };
 
   // Process normal CSS rule
-  var processRule = function (rule) {
+  var processRule = function(rule) {
     var strCss = '';
     strCss += rule.selectors.join(',\n') + ' {';
-    rule.declarations.forEach(function (rules) {
+    rule.declarations.forEach(function(rules) {
       strCss += commentOrDeclaration(rules);
     });
     strCss += '\n}\n\n';
@@ -58,7 +59,7 @@ module.exports = function (options) {
   };
 
   // Check rule type
-  var commentOrRule = function (rule) {
+  var commentOrRule = function(rule) {
     var strCss = '';
     if (rule.type === 'rule') {
       strCss += processRule(rule);
@@ -69,11 +70,11 @@ module.exports = function (options) {
   };
 
   // Check keyframe type
-  var commentOrKeyframe = function (frame) {
+  var commentOrKeyframe = function(frame) {
     var strCss = '';
     if (frame.type === 'keyframe') {
       strCss += frame.values.join(',') + ' {';
-      frame.declarations.forEach(function (declaration) {
+      frame.declarations.forEach(function(declaration) {
         strCss += commentOrDeclaration(declaration);
       });
       strCss += '\n}\n\n';
@@ -84,10 +85,10 @@ module.exports = function (options) {
   };
 
   // Process media queries
-  var processMedia = function (media) {
+  var processMedia = function(media) {
     var strCss = '';
     strCss += '@media ' + media.rule + ' {\n\n';
-    media.rules.forEach(function (rule) {
+    media.rules.forEach(function(rule) {
       strCss += commentOrRule(rule);
     });
     strCss += '}\n\n';
@@ -97,10 +98,10 @@ module.exports = function (options) {
   };
 
   // Process keyframes
-  var processKeyframes = function (key) {
+  var processKeyframes = function(key) {
     var strCss = '';
-    strCss += '@' + (typeof key.vendor !=='undefined'? key.vendor: '') + 'keyframes ' + key.name + ' {\n\n';
-    key.keyframes.forEach(function (keyframe) {
+    strCss += '@' + (typeof key.vendor !== 'undefined' ? key.vendor : '') + 'keyframes ' + key.name + ' {\n\n';
+    key.keyframes.forEach(function(keyframe) {
       strCss += commentOrKeyframe(keyframe);
     });
     strCss += '}\n\n';
@@ -108,7 +109,7 @@ module.exports = function (options) {
     return strCss;
   };
 
-  function transform (file, enc, cb) {
+  function transform(file, enc, cb) {
 
     if (file.isNull()) {
       this.push(file);
@@ -121,9 +122,11 @@ module.exports = function (options) {
     }
 
     var filename = path.relative(file.cwd, file.path);
+    var extFilename = filename.replace('.css', '.responsive.css');
     var source = file.contents.toString('utf8');
     var cssJson = parseCss(source);
     var strStyles = [];
+    var strMediaStyles = [];
     var processedCSS = {};
 
     log('File ' + filename + ' found.');
@@ -142,16 +145,16 @@ module.exports = function (options) {
     file.contents = new Buffer(cssJson);
 
     // For every rule in the stylesheet...
-    cssJson.stylesheet.rules.forEach( function (rule) {
+    cssJson.stylesheet.rules.forEach(function(rule) {
 
       // if the rule is a media query...
       if (rule.type === 'media') {
 
         // Create 'id' based on the query (stripped from spaces and dashes etc.)
-        var strMedia = rule.media.replace(/[^A-Za-z0-9]/ig,'');
+        var strMedia = rule.media.replace(/[^A-Za-z0-9]/ig, '');
 
         // Create an array with all the media queries with the same 'id'
-        var item = processedCSS.media.filter(function (element) {
+        var item = processedCSS.media.filter(function(element) {
           return (element.val === strMedia);
         });
 
@@ -168,15 +171,17 @@ module.exports = function (options) {
 
         // Compare the query to other queries
         var i = 0, matched = false;
-        processedCSS.media.forEach(function (elm) {
+        processedCSS.media.forEach(function(elm) {
           if (elm.val === strMedia) {
             matched = true;
           }
-          if (!matched) {i++;}
+          if (!matched) {
+            i++;
+          }
         });
 
         // Push every merged query
-        rule.rules.forEach(function (mediaRule) {
+        rule.rules.forEach(function(mediaRule) {
           if (mediaRule.type === 'rule' || 'comment') {
             processedCSS.media[i].rules.push(mediaRule);
           }
@@ -191,18 +196,18 @@ module.exports = function (options) {
     });
 
     // Sort media queries by kind, this is needed to output them in the right order
-    processedCSS.media.forEach(function (item) {
-      if (item.rule.match( /min-width/ )){
+    processedCSS.media.forEach(function(item) {
+      if (item.rule.match(/min-width/)) {
         processedCSS.media.minWidth.push(item);
-      } else if (item.rule.match( /min-height/ )){
+      } else if (item.rule.match(/min-height/)) {
         processedCSS.media.minHeight.push(item);
-      } else if (item.rule.match( /max-width/ )){
+      } else if (item.rule.match(/max-width/)) {
         processedCSS.media.maxWidth.push(item);
-      } else if (item.rule.match( /max-height/ )){
+      } else if (item.rule.match(/max-height/)) {
         processedCSS.media.maxHeight.push(item);
-      } else if (item.rule.match( /print/ )){
+      } else if (item.rule.match(/print/)) {
         processedCSS.media.print.push(item);
-      } else if (item.rule.match( /all/ )){
+      } else if (item.rule.match(/all/)) {
         processedCSS.media.all.push(item);
       } else {
         processedCSS.media.blank.push(item);
@@ -212,81 +217,91 @@ module.exports = function (options) {
     // Function to determine sort order
     var determineSortOrder = function(a, b, isMax) {
       var sortValA = a.sortVal,
-          sortValB = b.sortVal;
-          isMax = typeof isMax !== 'undefined' ? isMax : false;
+              sortValB = b.sortVal;
+      isMax = typeof isMax !== 'undefined' ? isMax : false;
 
       // consider print for sorting if sortVals are equal
       if (sortValA === sortValB) {
-        if (a.rule.match( /print/ )) {
+        if (a.rule.match(/print/)) {
           // a contains print and should be sorted after b
           return 1;
         }
-        if (b.rule.match( /print/ )) {
+        if (b.rule.match(/print/)) {
           // b contains print and should be sorted after a
           return -1;
         }
       }
 
       // return descending sort order for max-(width|height) media queries
-      if (isMax) { return sortValB-sortValA; }
+      if (isMax) {
+        return sortValB - sortValA;
+      }
 
       // return ascending sort order
-      return sortValA-sortValB;
+      return sortValA - sortValB;
     };
 
     // Sort media.all queries ascending
-    processedCSS.media.all.sort(function(a,b){
+    processedCSS.media.all.sort(function(a, b) {
       return determineSortOrder(a, b);
     });
 
     // Sort media.minWidth queries ascending
-    processedCSS.media.minWidth.sort(function(a,b){
+    processedCSS.media.minWidth.sort(function(a, b) {
       return determineSortOrder(a, b);
     });
 
     // Sort media.minHeight queries ascending
-    processedCSS.media.minHeight.sort(function(a,b){
+    processedCSS.media.minHeight.sort(function(a, b) {
       return determineSortOrder(a, b);
     });
 
     // Sort media.maxWidth queries descending
-    processedCSS.media.maxWidth.sort(function(a,b){
+    processedCSS.media.maxWidth.sort(function(a, b) {
       return determineSortOrder(a, b, true);
     });
 
     // Sort media.maxHeight queries descending
-    processedCSS.media.maxHeight.sort(function(a,b){
+    processedCSS.media.maxHeight.sort(function(a, b) {
       return determineSortOrder(a, b, true);
     });
 
     // Function to output base CSS
-    var outputBase = function(base){
-      base.forEach(function (rule) {
+    var outputBase = function(base) {
+      base.forEach(function(rule) {
         strStyles += commentOrRule(rule);
       });
     };
 
     // Function to output media queries
-    var outputMedia = function(media){
-      media.forEach(function(item){
-        strStyles += processMedia(item);
-      });
-    };
+    var outputMedia = function(media) {
+      if (options.use_external) {
+        media.forEach(function(item) {
+          strMediaStyles += processMedia(item);
+        });
+      } else {
+        media.forEach(function(item) {
+          strStyles += processMedia(item);
+        });
+      }
+
+    }
+    ;
 
     // Function to output keyframes
-    var outputKeyFrames = function(keyframes){
-      keyframes.forEach(function (keyframe) {
+    var outputKeyFrames = function(keyframes) {
+      keyframes.forEach(function(keyframe) {
         strStyles += processKeyframes(keyframe);
       });
     };
 
     // Check if base CSS was processed and print them
-    if (processedCSS.base.length !== 0){
+    if (processedCSS.base.length !== 0) {
       outputBase(processedCSS.base);
     }
 
     // Check if media queries were processed and print them in order
-    if (processedCSS.media.length !== 0){
+    if (processedCSS.media.length !== 0) {
       log('Processed media queries:');
       outputMedia(processedCSS.media.blank);
       outputMedia(processedCSS.media.all);
@@ -298,7 +313,7 @@ module.exports = function (options) {
     }
 
     // Check if keyframes were processed and print them
-    if (processedCSS.keyframes.length !== 0){
+    if (processedCSS.keyframes.length !== 0) {
       outputKeyFrames(processedCSS.keyframes);
     }
 
@@ -311,7 +326,19 @@ module.exports = function (options) {
     file.contents = new Buffer(strStyles);
     log(gutil.colors.cyan('File ' + filename + ' created.'));
 
+    if (options.use_external && processedCSS.media.length !== 0) {
+      var f = new gutil.File({
+        base: file.base,
+        path: extFilename,
+        contents: new Buffer(strMediaStyles)
+      });     
+      log(gutil.colors.cyan('File ' + extFilename + ' created.'));
+    }
     this.push(file);
+    if (options.use_external && processedCSS.media.length !== 0) {
+      this.push(f);
+    }
+
     cb();
   }
 
