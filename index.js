@@ -24,6 +24,12 @@ module.exports = function(options) {
     }
   };
 
+  // Process Imports
+  var processImport = function(cssImport) {
+    var strCss = '@import ' + cssImport.import + ';' + '\n\n';
+    return strCss;
+  };
+
   // Process comments
   var processComment = function(comment) {
     var strCss = '/*' + comment.comment + '*/';
@@ -131,6 +137,7 @@ module.exports = function(options) {
 
     log('File ' + filename + ' found.');
 
+    processedCSS.imports = [];
     processedCSS.base = [];
     processedCSS.media = [];
     processedCSS.media.all = [];
@@ -146,6 +153,11 @@ module.exports = function(options) {
 
     // For every rule in the stylesheet...
     cssJson.stylesheet.rules.forEach(function(rule) {
+
+      // If the rule type is an import
+      if(rule.type === 'import') {
+        processedCSS.imports.push(rule);
+      }
 
       // if the rule is a media query...
       if (rule.type === 'media') {
@@ -266,6 +278,13 @@ module.exports = function(options) {
       return determineSortOrder(a, b, true);
     });
 
+    // Function to output CSS Imports
+    var outputImports = function(base){
+      base.forEach(function (rule) {
+        strStyles += processImport(rule);
+      });
+    };
+
     // Function to output base CSS
     var outputBase = function(base) {
       base.forEach(function(rule) {
@@ -294,6 +313,11 @@ module.exports = function(options) {
         strStyles += processKeyframes(keyframe);
       });
     };
+
+    // Check if the imports CSS was processed and print them
+    if (processedCSS.imports.length !== 0){
+      outputImports(processedCSS.imports);
+    }
 
     // Check if base CSS was processed and print them
     if (processedCSS.base.length !== 0) {
@@ -331,7 +355,7 @@ module.exports = function(options) {
         base: file.base,
         path: extFilename,
         contents: new Buffer(strMediaStyles)
-      });     
+      });
       log(gutil.colors.cyan('File ' + extFilename + ' created.'));
     }
     this.push(file);
